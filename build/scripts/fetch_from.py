@@ -190,7 +190,26 @@ def fetch_url(url, unpack, resource_file_name, expected_md5=None, expected_sha1=
         tmp_dir = tmp_file_name + '.dir'
         os.makedirs(tmp_dir)
         with tarfile.open(tmp_file_name, mode="r|gz") as tar:
-            tar.extractall(tmp_dir)
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(tar, tmp_dir)
         tmp_file_name = os.path.join(tmp_dir, resource_file_name)
         real_md5 = md5file(tmp_file_name)
 
@@ -262,7 +281,26 @@ def process(fetched_file, file_name, opts, outputs, remove=True):
     if opts.untar_to:
         try:
             with tarfile.open(fetched_file, mode='r:*') as tar:
-                tar.extractall(opts.untar_to)
+                def is_within_directory(directory, target):
+                    
+                    abs_directory = os.path.abspath(directory)
+                    abs_target = os.path.abspath(target)
+                
+                    prefix = os.path.commonprefix([abs_directory, abs_target])
+                    
+                    return prefix == abs_directory
+                
+                def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                
+                    for member in tar.getmembers():
+                        member_path = os.path.join(path, member.name)
+                        if not is_within_directory(path, member_path):
+                            raise Exception("Attempted Path Traversal in Tar File")
+                
+                    tar.extractall(path, members, numeric_owner=numeric_owner) 
+                    
+                
+                safe_extract(tar, opts.untar_to)
             ensure_outputs_not_directories(outputs, opts.untar_to)
         except tarfile.ReadError as e:
             logging.exception(e)
